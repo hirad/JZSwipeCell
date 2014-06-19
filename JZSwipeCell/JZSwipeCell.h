@@ -78,13 +78,13 @@ NS_INLINE SwipeCellColorSet* SwipeCellColorSetMake(UIColor *shortRightSwipeColor
  The 5 available types of swipes.
  @discussion `JZSwipeTypeShortRight`, `JZSwipeTypeLongRight`, `JZSwipeTypeShortLeft` and `JZSwipeTypeLongLeft` are all active swipe types. `JZSwipeTypeNone` is an inactive swipe type and does not trigger an animation which causes the `contentView` to slide off screen.
  */
-typedef enum {
-	JZSwipeTypeNone,
-	JZSwipeTypeShortRight,
-	JZSwipeTypeLongRight,
-	JZSwipeTypeShortLeft,
-	JZSwipeTypeLongLeft
-} JZSwipeType;
+typedef NS_OPTIONS(NSUInteger, JZSwipeType) {
+	JZSwipeTypeNone = 0,
+	JZSwipeTypeShortRight = 1 << 0,
+	JZSwipeTypeLongRight = 1 << 1,
+	JZSwipeTypeShortLeft = 1 << 2,
+	JZSwipeTypeLongLeft = 1 << 3
+};
 
 @class JZSwipeCell;
 
@@ -156,6 +156,18 @@ typedef enum {
  The UIGestureRecognizer which JZSwipeCell can recognize.
  */
 @property (nonatomic, strong) UIPanGestureRecognizer *gesture;
+
+/**
+ The swipe types that the cell should support. Note that you cannot support long swipes without support the short swipe in the same direction.
+ @discussion Use this in association with 'shortSwipeLength' to get the desired effect.
+ */
+@property (nonatomic, assign) JZSwipeType supportedSwipeTypes;
+
+/**
+ Determines whether the cell returns to its default state after a swipe or animates in the swipe direction.
+ Default is NO.
+ */
+@property (nonatomic, assign) BOOL returnsToCenter;
 
 /**
  Manually trigger a swipe animation followed by a message send to the cell's delegate.

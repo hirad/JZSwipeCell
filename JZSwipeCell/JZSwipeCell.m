@@ -44,18 +44,15 @@ static CGFloat const kMaxBounceAmount = 8;
 
 - (id)init
 {
-	self = [super init];
-    if (self) {
-		[self configureCell];
-    }
-    return self;
+	return [self initWithStyle:UITableViewCellStyleDefault reuseIdentifier:nil];
 }
 
 - (id)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier
 {
 	self = [super initWithStyle:style reuseIdentifier:reuseIdentifier];
     if (self) {
-		[self configureCell];
+			[self configureCell];
+			self.returnsToCenter = NO;
     }
     return self;
 }
@@ -130,7 +127,7 @@ static CGFloat const kMaxBounceAmount = 8;
 	
 	if (!self.contentView)
 	{
-		self.contentView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.frame.size.width, self.frame.size.height)];
+		self.contentView = [[UIView alloc] initWithFrame:self.bounds];
 		[self addSubview:self.contentView];
 	}
 	
@@ -170,7 +167,7 @@ static CGFloat const kMaxBounceAmount = 8;
 			self.dragStart = sender.view.center.x;
 			break;
 		case UIGestureRecognizerStateChanged:
-			self.contentView.center = CGPointMake(self.dragStart + translatedPoint.x, self.contentView.center.y);
+            self.contentView.center = CGPointMake(self.dragStart + translatedPoint.x, self.contentView.center.y);
 			CGFloat diff = translatedPoint.x;
 			
 			JZSwipeType originalSwipe = self.currentSwipe;
@@ -198,9 +195,17 @@ static CGFloat const kMaxBounceAmount = 8;
 					}
 					else
 					{
-						self.icon.image = self.imageSet.longRightSwipeImage;
-						self.backgroundView.backgroundColor = self.colorSet.longRightSwipeColor;
-						self.currentSwipe = JZSwipeTypeLongRight;
+						// if long, right swipe is not supported cancel the swipe
+						if (!(self.supportedSwipeTypes & JZSwipeTypeLongRight))
+						{
+							[self resetSwipeWithGestureRecognizer:sender fromPoint:translatedPoint];
+						}
+						else
+						{
+							self.icon.image = self.imageSet.longRightSwipeImage;
+							self.backgroundView.backgroundColor = self.colorSet.longRightSwipeColor;
+							self.currentSwipe = JZSwipeTypeLongRight;
+						}
 					}
 					
 					self.icon.center = CGPointMake(self.contentView.frame.origin.x - ((self.icon.frame.size.width / 2) + kIconHorizontalPadding), self.contentView.frame.size.height / 2);
@@ -230,9 +235,16 @@ static CGFloat const kMaxBounceAmount = 8;
 					}
 					else
 					{
-						self.icon.image = self.imageSet.longLeftSwipeImage;
-						self.backgroundView.backgroundColor = self.colorSet.longLeftSwipeColor;
-						self.currentSwipe = JZSwipeTypeLongLeft;
+						// if long, left swipes not supported, cancel swipe
+						if(!(self.supportedSwipeTypes & JZSwipeTypeLongLeft)){
+							[self resetSwipeWithGestureRecognizer:sender fromPoint:translatedPoint];
+						}
+						else
+						{
+							self.icon.image = self.imageSet.longLeftSwipeImage;
+							self.backgroundView.backgroundColor = self.colorSet.longLeftSwipeColor;
+							self.currentSwipe = JZSwipeTypeLongLeft;
+						}
 					}
 					
 					self.icon.center = CGPointMake((self.contentView.frame.origin.x + self.contentView.frame.size.width) + ((self.icon.frame.size.width / 2) + kIconHorizontalPadding), self.contentView.frame.size.height / 2);
@@ -248,13 +260,16 @@ static CGFloat const kMaxBounceAmount = 8;
 			
 			break;
 		case UIGestureRecognizerStateEnded:
-			if (self.currentSwipe != JZSwipeTypeNone)
+			if (self.currentSwipe != JZSwipeTypeNone && !(self.returnsToCenter))
 				[self runSwipeAnimationForType:self.currentSwipe];
 			else
 				[self runBounceAnimationFromPoint:translatedPoint];
+            
+            if ([self.delegate respondsToSelector:@selector(swipeCell:triggeredSwipeWithType:)])
+                [self.delegate swipeCell:self triggeredSwipeWithType:self.currentSwipe];
 			break;
 		case UIGestureRecognizerStateCancelled:
-			
+			sender.enabled = YES;
 			break;
 		case UIGestureRecognizerStateFailed:
 			
@@ -295,8 +310,6 @@ static CGFloat const kMaxBounceAmount = 8;
 						 self.contentView.center = CGPointMake(newViewCenterX, self.contentView.center.y);
 						 self.icon.alpha = iconAlpha;
 					 } completion:^(BOOL finished) {
-						 if ([self.delegate respondsToSelector:@selector(swipeCell:triggeredSwipeWithType:)])
-							 [self.delegate swipeCell:self triggeredSwipeWithType:type];
 						 self.dragStart = CGFLOAT_MIN;
 					 }];
 }
@@ -323,6 +336,12 @@ static CGFloat const kMaxBounceAmount = 8;
 					 }];
 }
 
+-(void)resetSwipeWithGestureRecognizer:(UIPanGestureRecognizer*)gestureRecognizer fromPoint:(CGPoint)translatedPoint
+{
+    gestureRecognizer.enabled = NO;
+    [self runBounceAnimationFromPoint:translatedPoint];
+}
+
 #pragma mark - UIGestureRecognizerDelegate methods
 
 - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
@@ -331,6 +350,15 @@ static CGFloat const kMaxBounceAmount = 8;
 		return YES;
 	
 	CGPoint translation = [(UIPanGestureRecognizer*)gestureRecognizer translationInView:self];
+    
+    // if we don't support swipe in this direction, ignore swipe
+    CGFloat horizontalTranslation = translation.x;
+    if (horizontalTranslation < 0) {
+        return self.supportedSwipeTypes & JZSwipeTypeShortLeft;
+    }
+    else
+        return self.supportedSwipeTypes & JZSwipeTypeShortRight;
+    
     return fabs(translation.y) < fabs(translation.x);
 }
 
